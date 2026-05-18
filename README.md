@@ -22,9 +22,9 @@ git clone <your-fork-url> leetcode-workout
 cd leetcode-workout
 
 # 2. Create a virtual environment and install dependencies
-python -m venv .venv
-source .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
 
 # 3. Configure your secrets and preferences
 cp .env.example .env
