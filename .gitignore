@@ -47,3 +47,8 @@ ENV/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# =============================================================================
+# Claude Code conversation exports (`/export` default filename)
+# =============================================================================
+*command-message*.txt
