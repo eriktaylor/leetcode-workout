@@ -72,7 +72,7 @@ any datasets you drop in stay local.
 
 ## Configuration
 
-All knobs live in `.env` — copy `env.example` and edit. Every setting is
+All knobs live in `.env` — copy `.env.example` and edit. Every setting is
 documented inline there, including the `REVIEW_PERCENTAGE` review/new mix
 guide.
 
@@ -138,7 +138,7 @@ All files under `data/` are gitignored, so anything you place there stays local.
 ## Troubleshooting
 
 **`ERROR: Missing LeetCode credentials`** — your `.env` is missing or empty.
-Run `cp env.example .env` and fill in both values.
+Run `cp .env.example .env` and fill in both values.
 
 **Fetcher returns 0 submissions** — your cookies have probably expired. Pull
 fresh `LEETCODE_SESSION` and `csrftoken` values from your browser.
