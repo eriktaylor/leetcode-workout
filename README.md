@@ -72,37 +72,9 @@ any datasets you drop in stay local.
 
 ## Configuration
 
-All knobs live in `.env`. Copy `env.example`, then edit:
-
-| Variable                 | Purpose                                                        | Default |
-| ------------------------ | -------------------------------------------------------------- | ------- |
-| `LEETCODE_SESSION`       | Your `LEETCODE_SESSION` cookie (required)                      | —       |
-| `CSRF_TOKEN`             | Your `csrftoken` cookie (required)                             | —       |
-| `LEETCODE_DATA_DIR`      | Where inputs/outputs live                                      | `./data` |
-| `FETCH_LIMIT`            | Submissions per normal run                                     | `60`    |
-| `FIRST_RUN_FETCH_LIMIT`  | Submissions on first run (no prior history)                    | `500`   |
-| `ENRICH_LIMIT`           | Max NEW problems to enrich (one API call each)                 | `100`   |
-| `TOP_K`                  | Number of problems in the final workout plan                   | `10`    |
-| `REVIEW_PERCENTAGE`      | Review vs new mix (1–100); see guide below                     | `70`    |
-| `SKIP_FETCH`             | Skip downloading; regenerate from existing data                | `false` |
-| `ALLOW_PREMIUM`          | Include LeetCode Premium problems                              | `false` |
-| `NEETCODE150_ONLY`       | Restrict recommendations to the NeetCode 150 list              | `true`  |
-
-### `REVIEW_PERCENTAGE` guide
-
-Based on learning science suggesting ~85% accuracy is the optimal error rate
-for retention:
-
-| Range  | Mode              | When to use                                        |
-| ------ | ----------------- | -------------------------------------------------- |
-| 80–90  | Consolidation     | Interview prep, solidifying what you already know  |
-| 60–80  | Balanced learning | Recommended default for most users                 |
-| 40–60  | Growth            | Expanding into new problem types                   |
-| 20–40  | Challenge         | Pushing into unfamiliar territory                  |
-
-Reviews are also weighted by spaced repetition (7–14d ago = low priority,
-30–90d = high, 90d+ = highest) and boosted for problems you previously
-struggled with.
+All knobs live in `.env` — copy `env.example` and edit. Every setting is
+documented inline there, including the `REVIEW_PERCENTAGE` review/new mix
+guide.
 
 ---
 
