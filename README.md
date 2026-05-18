@@ -27,7 +27,7 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 
 # 3. Configure your secrets and preferences
-cp env.example .env
+cp .env.example .env
 # ...then open .env in your editor and fill in LEETCODE_SESSION and CSRF_TOKEN
 
 # 4. Run
@@ -53,7 +53,7 @@ leetcode-workout/
 ├── problems_list/
 │   └── neetcode_150.json   # Bundled curated problem list
 ├── requirements.txt
-├── env.example             # Template for your local .env
+├── .env.example             # Template for your local .env
 ├── .gitignore              # Keeps .env and data/* out of git
 ├── README.md
 └── data/                   # All inputs and outputs live here (gitignored)

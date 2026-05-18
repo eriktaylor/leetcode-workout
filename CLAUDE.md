@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 uv venv
 source .venv/bin/activate
 uv pip install -r requirements.txt
-cp env.example .env   # then fill in LEETCODE_SESSION and CSRF_TOKEN
+cp .env.example .env   # then fill in LEETCODE_SESSION and CSRF_TOKEN
 ```
 
 The bundled NeetCode 150 list (`problems_list/neetcode_150.json`) is the
