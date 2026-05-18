@@ -7,10 +7,9 @@
 
 # =============================================================================
 # Generated outputs and local data
-# Everything in data/ is local-only EXCEPT files explicitly allowlisted below.
-# Drop your input datasets (leetcode_problem_company_tags.csv,
-# leetcode_questions_kaggle.csv) into data/ and they'll stay ignored too,
-# which is correct — they're not your data to redistribute.
+# Everything in data/ is local-only except .gitkeep. Any third-party datasets
+# you drop in data/ (e.g. a Kaggle problem dump) stay ignored — they're not
+# yours to redistribute.
 # =============================================================================
 data/*
 !data/.gitkeep
