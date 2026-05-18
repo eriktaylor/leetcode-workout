@@ -1,0 +1,49 @@
+# =============================================================================
+# Secrets — never commit
+# =============================================================================
+.env
+.env.local
+.env.*.local
+
+# =============================================================================
+# Generated outputs and local data
+# Everything in data/ is local-only EXCEPT files explicitly allowlisted below.
+# Drop your input datasets (leetcode_problem_company_tags.csv,
+# leetcode_questions_kaggle.csv) into data/ and they'll stay ignored too,
+# which is correct — they're not your data to redistribute.
+# =============================================================================
+data/*
+!data/.gitkeep
+
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# =============================================================================
+# Editors / IDEs
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =============================================================================
+# OS
+# =============================================================================
+.DS_Store
+Thumbs.db
+desktop.ini
