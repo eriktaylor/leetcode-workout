@@ -88,6 +88,17 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "y", "on")
 
 
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        print(f"WARNING: {name}={raw!r} is not a number; using default {default}")
+        return default
+
+
 def _require_credentials() -> tuple[str, str]:
     session = os.getenv("LEETCODE_SESSION", "").strip()
     csrf = os.getenv("CSRF_TOKEN", "").strip()
@@ -133,6 +144,17 @@ def parse_args() -> argparse.Namespace:
     nc150.add_argument("--no-neetcode150-only", dest="neetcode_150_only", action="store_false",
                        help="Allow recommendations outside NeetCode 150 (requires data/Leetcode.csv)")
 
+    cache_grp = p.add_mutually_exclusive_group()
+    cache_grp.add_argument("--use-cache", dest="use_cache", action="store_true", default=None,
+                           help="Enable smart fetch/analytics caching (env: USE_CACHE)")
+    cache_grp.add_argument("--no-use-cache", dest="use_cache", action="store_false",
+                           help="Disable caching — always fetch and regenerate analytics")
+
+    p.add_argument("--staleness-days", type=int, default=None,
+                   help="Days before forcing universe re-enrichment (env: STALENESS_DAYS)")
+    p.add_argument("--workout-jitter", type=float, default=None,
+                   help="Score jitter std-dev for recommendation variety (env: WORKOUT_JITTER)")
+
     p.add_argument(
         "--step",
         choices=["universe", "fetch", "enrich", "recommend", "save-plan", "analytics"],
@@ -171,6 +193,18 @@ def resolve_config(args: argparse.Namespace) -> dict:
         "neetcode_150_only": (
             args.neetcode_150_only if args.neetcode_150_only is not None
             else _env_bool("NEETCODE150_ONLY", True)
+        ),
+        "use_cache": (
+            args.use_cache if args.use_cache is not None
+            else _env_bool("USE_CACHE", True)
+        ),
+        "staleness_days": (
+            args.staleness_days if args.staleness_days is not None
+            else _env_int("STALENESS_DAYS", 15)
+        ),
+        "workout_jitter": (
+            args.workout_jitter if args.workout_jitter is not None
+            else _env_float("WORKOUT_JITTER", 2.0)
         ),
     }
 
@@ -250,6 +284,9 @@ def main() -> int:
         review_percentage=cfg["review_percentage"],
         allow_premium=cfg["allow_premium"],
         neetcode_150_only=cfg["neetcode_150_only"],
+        use_cache=cfg["use_cache"],
+        staleness_days=cfg["staleness_days"],
+        workout_jitter=cfg["workout_jitter"],
     )
 
     if isinstance(results, dict):

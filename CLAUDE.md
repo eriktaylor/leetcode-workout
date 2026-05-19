@@ -36,6 +36,22 @@ python leetcode_workout.py --step save-plan   # recommend + write .txt
 python leetcode_workout.py --step analytics   # regenerate the chart only
 ```
 
+## Project layout
+
+```
+leetcode-workout/
+├── leetcode_workout.py     # Entry point
+├── utils.py                # All pipeline implementation
+├── problems_list/
+│   └── neetcode_150.json   # Bundled curated problem list (source of truth)
+├── .env.example
+└── data/                   # Gitignored; all inputs and outputs live here
+    ├── problem_universe.csv               # enriched candidate pool (cached)
+    ├── Leetcode.csv                        # optional Kaggle dataset (user-provided)
+    ├── leetcode_history_enriched_clean.csv # deduped working history
+    └── leetcode_workout_plan_YYYY-MM-DD.txt
+```
+
 ## Architecture
 
 Two-file project: `leetcode_workout.py` (CLI/entry point) + `utils.py` (implementation).

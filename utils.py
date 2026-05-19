@@ -41,6 +41,41 @@ NEETCODE_150_PATH = Path(__file__).resolve().parent / "problems_list" / "neetcod
 PROBLEM_UNIVERSE_FILENAME = "problem_universe.csv"
 EXTENDED_DATASET_FILENAME = "Leetcode.csv"
 CLEAN_HISTORY_FILENAME = "leetcode_history_enriched_clean.csv"
+FETCH_CACHE_FILENAME = "pipeline_cache.json"
+
+
+# =============================================================================
+# PIPELINE CACHE — tracks fetch state, universe freshness, analytics runs
+# =============================================================================
+def load_pipeline_cache(drive_path: str = DEFAULT_DRIVE_PATH) -> dict:
+    """Load the JSON cache that tracks last-fetch state, universe age, etc."""
+    path = os.path.join(drive_path, FETCH_CACHE_FILENAME)
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def save_pipeline_cache(cache: dict, drive_path: str = DEFAULT_DRIVE_PATH) -> None:
+    os.makedirs(drive_path, exist_ok=True)
+    path = os.path.join(drive_path, FETCH_CACHE_FILENAME)
+    with open(path, "w") as f:
+        json.dump(cache, f, indent=2, default=str)
+
+
+def _get_next_trial_number(drive_path: str, date_str: str) -> int:
+    """Return 1 if no plan file exists for date_str, else the next unused trial number."""
+    if not os.path.exists(os.path.join(drive_path, f"leetcode_workout_plan_{date_str}.txt")):
+        return 1
+    for n in range(2, 100):
+        if not os.path.exists(
+            os.path.join(drive_path, f"leetcode_workout_plan_{date_str}_trial{n}.txt")
+        ):
+            return n
+    return 100
 
 
 # =============================================================================
@@ -158,6 +193,38 @@ class LeetCodeFetcher:
         if not df.empty and "timestamp" in df.columns:
             df["date"] = pd.to_datetime(df["timestamp"].astype(int), unit="s")
         return df
+
+    def peek_latest_submission(self) -> tuple[str | None, str | None]:
+        """Fetch only the most recent submission to detect new activity cheaply.
+
+        Returns (submission_id, titleSlug) or (None, None) on failure.
+        """
+        query = """
+        query Submissions($offset: Int!, $limit: Int!) {
+            submissionList(offset: $offset, limit: $limit) {
+                submissions { id titleSlug }
+            }
+        }
+        """
+        try:
+            resp = requests.post(
+                self.url,
+                headers=self.headers,
+                json={"query": query, "variables": {"offset": 0, "limit": 1}},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                subs = (
+                    resp.json()
+                    .get("data", {})
+                    .get("submissionList", {})
+                    .get("submissions", [])
+                )
+                if subs:
+                    return str(subs[0]["id"]), subs[0].get("titleSlug")
+        except Exception:
+            pass
+        return None, None
 
 
 # =============================================================================
@@ -464,6 +531,7 @@ def enrich_problem_universe(slugs: list[str]) -> pd.DataFrame:
 def build_problem_universe(
     base_path: str = DEFAULT_DRIVE_PATH,
     include_extended: bool = True,
+    force_reenrich: bool = False,
 ) -> pd.DataFrame:
     """Build (and cache) the recommendation universe.
 
@@ -479,7 +547,9 @@ def build_problem_universe(
     universe_path = os.path.join(base_path, PROBLEM_UNIVERSE_FILENAME)
 
     cached = None
-    if os.path.exists(universe_path):
+    if force_reenrich:
+        print("   -> Forcing full re-enrichment (staleness threshold exceeded)")
+    elif os.path.exists(universe_path):
         cached = pd.read_csv(universe_path)
         print(f"   -> Loaded cached universe: {len(cached)} problems")
 
@@ -545,11 +615,13 @@ class LeetCodeSmartRecommender:
         review_percentage: int = 70,
         allow_premium: bool = False,
         neetcode_150_only: bool = True,
+        jitter: float = 2.0,
     ):
         self.base_path = base_path
         self.review_percentage = max(1, min(100, review_percentage))
         self.allow_premium = allow_premium
         self.neetcode_150_only = neetcode_150_only
+        self.jitter = max(0.0, float(jitter))
 
         self.df_universe = pd.DataFrame()
         self.df_hist = pd.DataFrame()
@@ -684,13 +756,16 @@ class LeetCodeSmartRecommender:
         else:
             score += 12
 
-        score += float(np.random.normal(0, 2))
+        score += float(np.random.normal(0, self.jitter))
         return score
 
-    def rank(self, candidates: pd.DataFrame, top_k: int = 10) -> pd.DataFrame:
+    def rank(self, candidates: pd.DataFrame, top_k: int = 10, seed: int | None = None) -> pd.DataFrame:
         if candidates.empty:
             print("⚠️ No candidates to rank")
             return pd.DataFrame()
+
+        if seed is not None:
+            np.random.seed(seed)
 
         candidates = candidates.copy()
         candidates["Final_Score"] = candidates.apply(self._score_row, axis=1)
@@ -766,6 +841,7 @@ def save_workout_plan(
     recommender: LeetCodeSmartRecommender,
     drive_path: str = DEFAULT_DRIVE_PATH,
     top_n: int = 10,
+    trial: int = 1,
 ) -> str:
     if recommender.df_final.empty:
         print("❌ No recommendations available.")
@@ -773,7 +849,8 @@ def save_workout_plan(
 
     top = recommender.df_final.head(top_n)
     date_str = datetime.now().strftime("%Y-%m-%d")
-    output_path = os.path.join(drive_path, f"leetcode_workout_plan_{date_str}.txt")
+    suffix = f"_trial{trial}" if trial > 1 else ""
+    output_path = os.path.join(drive_path, f"leetcode_workout_plan_{date_str}{suffix}.txt")
 
     lines = [
         "=" * 60,
@@ -931,26 +1008,89 @@ def run_full_workout_pipeline(
     review_percentage: int = 70,
     allow_premium: bool = False,
     neetcode_150_only: bool = True,
+    use_cache: bool = True,
+    staleness_days: int = 15,
+    workout_jitter: float = 2.0,
 ) -> dict:
-    """Run the full pipeline: universe → fetch → enrich → recommend → save → analytics."""
-    results: dict = {}
+    """Run the full pipeline: universe → fetch → enrich → recommend → save → analytics.
 
+    Smart caching (when use_cache=True):
+      - Peeks at the latest submission before a full fetch; skips the fetch and
+        analytics if nothing has changed since last run.
+      - Re-enriches the universe from scratch when it is older than staleness_days.
+      - Saves a trialN plan file when re-running without new submissions so each
+        run produces a fresh variety of recommendations.
+    """
+    results: dict = {}
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    cache = load_pipeline_cache(drive_path)
+
+    # ---- Universe staleness check ----------------------------------------
+    force_reenrich = False
+    if use_cache and cache.get("universe_last_enriched"):
+        try:
+            age_days = (
+                datetime.now()
+                - datetime.strptime(cache["universe_last_enriched"], "%Y-%m-%d")
+            ).days
+            if age_days >= staleness_days:
+                print(
+                    f"\n⚠️  Universe is {age_days}d old "
+                    f"(threshold: {staleness_days}d) — forcing re-enrichment"
+                )
+                force_reenrich = True
+        except ValueError:
+            pass
+
+    # ---- Smart fetch-cache check ----------------------------------------
+    # has_new_submissions = True  →  run full fetch + analytics
+    # has_new_submissions = False →  skip fetch + analytics; use trial naming
+    # (skip_fetch=True leaves has_new_submissions=True; we honour the explicit flag)
+    has_new_submissions = True
+    if not skip_fetch and use_cache and leetcode_session and csrf_token:
+        print("\n🔍 Checking for new submissions...")
+        latest_id, latest_slug = LeetCodeFetcher(
+            leetcode_session, csrf_token
+        ).peek_latest_submission()
+        cached_newest = cache.get("newest_submission_id")
+        if latest_id and cached_newest and latest_id == str(cached_newest):
+            has_new_submissions = False
+            print(
+                f"   -> No new submissions (latest: {latest_slug})\n"
+                "   -> Skipping fetch & analytics; generating fresh recommendations"
+            )
+        elif latest_id:
+            print(f"   -> New activity detected (latest: {latest_slug})")
+        else:
+            print("   -> Peek failed; proceeding with full fetch")
+
+    # ---- STEP 1: Problem universe ----------------------------------------
     print("\n" + "=" * 60)
     print("STEP 1: PROBLEM UNIVERSE")
     print("=" * 60)
-    build_problem_universe(drive_path, include_extended=not neetcode_150_only)
+    build_problem_universe(
+        drive_path,
+        include_extended=not neetcode_150_only,
+        force_reenrich=force_reenrich,
+    )
     results["universe_path"] = os.path.join(drive_path, PROBLEM_UNIVERSE_FILENAME)
+    if force_reenrich or not cache.get("universe_last_enriched"):
+        cache["universe_last_enriched"] = today_str
 
-    clean_path = os.path.join(drive_path, CLEAN_HISTORY_FILENAME)
-    is_first_run = not os.path.exists(clean_path)
-    actual_fetch_limit = first_run_fetch_limit if is_first_run else fetch_limit
-    if is_first_run:
-        print(f"\n📭 First run detected — fetching {actual_fetch_limit} submissions for profile bootstrap")
-
-    if not skip_fetch:
+    # ---- STEP 2 & 3: Fetch + enrich (only when new submissions exist) ----
+    if has_new_submissions and not skip_fetch:
         if not leetcode_session or not csrf_token:
             print("⚠️ Skipping fetch: no credentials provided")
         else:
+            clean_path = os.path.join(drive_path, CLEAN_HISTORY_FILENAME)
+            is_first_run = not os.path.exists(clean_path)
+            actual_fetch_limit = first_run_fetch_limit if is_first_run else fetch_limit
+            if is_first_run:
+                print(
+                    f"\n📭 First run — fetching {actual_fetch_limit} submissions "
+                    "for profile bootstrap"
+                )
+
             print("\n" + "=" * 60)
             print(f"STEP 2: FETCHING SUBMISSIONS ({actual_fetch_limit})")
             print("=" * 60)
@@ -965,6 +1105,12 @@ def run_full_workout_pipeline(
                 print("Possible causes: expired cookies, rate limiting, or network.")
                 print("Continuing with EXISTING history (if any).\n")
             else:
+                # Update cache with the newest submission we just fetched
+                if "id" in df_new.columns:
+                    cache["newest_submission_id"] = str(df_new.iloc[0]["id"])
+                    cache["newest_submission_slug"] = df_new.iloc[0].get("titleSlug", "")
+                    cache["last_fetch_date"] = today_str
+
                 print("\n" + "=" * 60)
                 print("STEP 3: ENRICHING HISTORY")
                 print("=" * 60)
@@ -972,23 +1118,35 @@ def run_full_workout_pipeline(
                 results["history_path"] = history_path
                 results["clean_path"] = deduplicate_and_save_clean(history_path, drive_path)
 
+    # ---- STEP 4: Recommendations ----------------------------------------
     print("\n" + "=" * 60)
     print("STEP 4: RECOMMENDATIONS")
     print("=" * 60)
+    trial = _get_next_trial_number(drive_path, today_str) if not has_new_submissions else 1
+    if trial > 1:
+        print(f"   -> No new submissions — generating trial {trial} recommendations")
+
     recommender = LeetCodeSmartRecommender(
         base_path=drive_path,
         review_percentage=review_percentage,
         allow_premium=allow_premium,
         neetcode_150_only=neetcode_150_only,
+        jitter=workout_jitter,
     )
     recommender.run(top_k=top_k)
+    results["workout_path"] = save_workout_plan(recommender, drive_path, top_n=top_k, trial=trial)
 
-    results["workout_path"] = save_workout_plan(recommender, drive_path, top_n=top_k)
-
+    # ---- STEP 5: Analytics (only on new submissions) --------------------
     print("\n" + "=" * 60)
     print("STEP 5: ANALYTICS")
     print("=" * 60)
-    results["analytics_path"] = generate_analytics_jpeg(drive_path)
+    if has_new_submissions:
+        results["analytics_path"] = generate_analytics_jpeg(drive_path)
+        cache["last_analytics_submission_id"] = cache.get("newest_submission_id", "")
+    else:
+        print("⏭️  No new submissions — skipping analytics update")
+
+    save_pipeline_cache(cache, drive_path)
 
     print("\n" + "=" * 60)
     print("✅ PIPELINE COMPLETE")

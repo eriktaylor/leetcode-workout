@@ -44,32 +44,6 @@ worrying about accidentally committing your practice history.
 
 ---
 
-## Project layout
-
-```
-leetcode-workout/
-├── leetcode_workout.py     # Entry point — what you run
-├── utils.py                # Pipeline implementation
-├── problems_list/
-│   └── neetcode_150.json   # Bundled curated problem list
-├── requirements.txt
-├── .env.example             # Template for your local .env
-├── .gitignore              # Keeps .env and data/* out of git
-├── README.md
-└── data/                   # All inputs and outputs live here (gitignored)
-    ├── problem_universe.csv               # generated — enriched candidate pool
-    ├── Leetcode.csv                        # input — optional Kaggle dataset
-    ├── leetcode_history_enriched_*.csv     # generated — dated history snapshots
-    ├── leetcode_history_enriched_clean.csv # generated — deduped working file
-    ├── leetcode_workout_plan_YYYY-MM-DD.txt   # generated — your workout
-    └── leetcode_analytics_YYYY-MM-DD.jpg      # generated — your dashboard
-```
-
-Everything under `data/` is gitignored (except a placeholder `.gitkeep`), so
-any datasets you drop in stay local.
-
----
-
 ## Configuration
 
 All knobs live in `.env` — copy `.env.example` and edit. Every setting is
