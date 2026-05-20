@@ -1,5 +1,7 @@
 # 🏋️ LeetCode Workout Generator
 
+![Workout Visual](workout.png)
+
 Generate a personalized LeetCode practice plan that balances:
 
 - **Personal weaknesses** — topics where your success rate is low
@@ -11,8 +13,6 @@ and an analytics chart (`leetcode_analytics_YYYY-MM-DD.jpg`).
 
 This is a local CLI tool. Your credentials and generated plans never leave your
 machine.
-
-![Workout Visual](workout.png)
 
 ---
 
