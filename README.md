@@ -1,6 +1,6 @@
 # 🏋️ LeetCode Workout Generator
 
-![Workout Visual](workout.png)
+![Workout Visual](workout.jpeg)
 
 Generate a personalized LeetCode practice plan that balances:
 
