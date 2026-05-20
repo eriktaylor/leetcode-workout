@@ -12,6 +12,8 @@ and an analytics chart (`leetcode_analytics_YYYY-MM-DD.jpg`).
 This is a local CLI tool. Your credentials and generated plans never leave your
 machine.
 
+![Workout Visual](workout.png)
+
 ---
 
 ## Quick start
